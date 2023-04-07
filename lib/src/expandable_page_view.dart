@@ -128,8 +128,14 @@ class ExpandablePageView extends StatefulWidget {
   /// This property defaults to true and must not be null.
   final bool padEnds;
 
-  /// Whether to use the max height/width of all children as the height of all pages
-  final bool useChildrenMaxLength;
+  /// Whether to maintain the size of the PageView according to the maximum size of the children.
+  ///
+  /// If this is set to true, the size of all children will be the same and has the value of the maximum size
+  /// of the children.
+  ///
+  /// This property defaults to false and must not be null.
+  /// reference: https://github.com/minhdanh/expandable_page_view.git
+  final bool useMaxSize;
 
   ExpandablePageView({
     required List<Widget> children,
@@ -150,7 +156,7 @@ class ExpandablePageView extends StatefulWidget {
     this.scrollBehavior,
     this.scrollDirection = Axis.horizontal,
     this.padEnds = true,
-    this.useChildrenMaxLength = true,
+    this.useMaxSize = false,
     Key? key,
   })  : assert(estimatedPageSize >= 0.0),
         children = children,
@@ -178,7 +184,7 @@ class ExpandablePageView extends StatefulWidget {
     this.scrollBehavior,
     this.scrollDirection = Axis.horizontal,
     this.padEnds = true,
-    this.useChildrenMaxLength = true,
+    this.useMaxSize = false,
     Key? key,
   })  : assert(estimatedPageSize >= 0.0),
         children = null,
@@ -228,6 +234,14 @@ class _ExpandablePageViewState extends State<ExpandablePageView> {
     }
     if (_shouldReinitializeHeights(oldWidget)) {
       _reinitializeSizes();
+    }
+
+    if (widget.useMaxSize) {
+      for (int i = 0; i < _sizes.length; i++) {
+        if (_sizes[_currentPage] > _sizes[i]) {
+          _sizes[i] = _sizes[_currentPage];
+        }
+      }
     }
   }
 
@@ -344,9 +358,23 @@ class _ExpandablePageViewState extends State<ExpandablePageView> {
   Widget _itemBuilder(BuildContext context, int index) {
     final item = widget.itemBuilder!(context, index);
     return OverflowPage(
-      onSizeChange: (size) => setState(
-        () => _sizes[index] = _isHorizontalScroll ? size.height : size.width,
-      ),
+      onSizeChange: (size) => setState(() {
+        if (widget.useMaxSize) {
+          for (int i = 0; i < _sizes.length; i++) {
+            if (_isHorizontalScroll) {
+              if (size.height > _sizes[i]) {
+                _sizes[i] = size.height;
+              }
+            } else {
+              if (size.width > _sizes[i]) {
+                _sizes[i] = size.width;
+              }
+            }
+          }
+        } else {
+          _sizes[index] = _isHorizontalScroll ? size.height : size.width;
+        }
+      }),
       child: item,
       alignment: widget.alignment,
       scrollDirection: widget.scrollDirection,
@@ -354,30 +382,30 @@ class _ExpandablePageViewState extends State<ExpandablePageView> {
   }
 
   List<Widget> _sizeReportingChildren() {
-    double currentMaxChildLength = 0;
     return widget.children!
         .asMap()
         .map(
           (index, child) => MapEntry(
             index,
             OverflowPage(
-              onSizeChange: (size) {
-                double childSize =
-                    _isHorizontalScroll ? size.height : size.width;
-                if (childSize > currentMaxChildLength) {
-                  currentMaxChildLength = childSize;
-                }
-                if (widget.useChildrenMaxLength &&
-                    childSize > currentMaxChildLength) {
-                  setState(() {
-                    _sizes = List.filled(widget.children!.length, childSize);
-                  });
+              onSizeChange: (size) => setState(() {
+                if (widget.useMaxSize) {
+                  for (int i = 0; i < _sizes.length; i++) {
+                    if (_isHorizontalScroll) {
+                      if (size.height > _sizes[i]) {
+                        _sizes[i] = size.height;
+                      }
+                    } else {
+                      if (size.width > _sizes[i]) {
+                        _sizes[i] = size.width;
+                      }
+                    }
+                  }
                 } else {
-                  setState(() {
-                    _sizes[index] = childSize;
-                  });
+                  _sizes[index] =
+                      _isHorizontalScroll ? size.height : size.width;
                 }
-              },
+              }),
               child: child,
               alignment: widget.alignment,
               scrollDirection: widget.scrollDirection,
