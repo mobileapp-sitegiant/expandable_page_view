@@ -128,6 +128,9 @@ class ExpandablePageView extends StatefulWidget {
   /// This property defaults to true and must not be null.
   final bool padEnds;
 
+  /// Whether to use the max height/width of all children as the height of all pages
+  final bool useChildrenMaxLength;
+
   ExpandablePageView({
     required List<Widget> children,
     this.controller,
@@ -147,6 +150,7 @@ class ExpandablePageView extends StatefulWidget {
     this.scrollBehavior,
     this.scrollDirection = Axis.horizontal,
     this.padEnds = true,
+    this.useChildrenMaxLength = true,
     Key? key,
   })  : assert(estimatedPageSize >= 0.0),
         children = children,
@@ -174,6 +178,7 @@ class ExpandablePageView extends StatefulWidget {
     this.scrollBehavior,
     this.scrollDirection = Axis.horizontal,
     this.padEnds = true,
+    this.useChildrenMaxLength = true,
     Key? key,
   })  : assert(estimatedPageSize >= 0.0),
         children = null,
@@ -348,24 +353,40 @@ class _ExpandablePageViewState extends State<ExpandablePageView> {
     );
   }
 
-  List<Widget> _sizeReportingChildren() => widget.children!
-      .asMap()
-      .map(
-        (index, child) => MapEntry(
-          index,
-          OverflowPage(
-            onSizeChange: (size) => setState(
-              () => _sizes[index] =
-                  _isHorizontalScroll ? size.height : size.width,
+  List<Widget> _sizeReportingChildren() {
+    double currentMaxChildLength = 0;
+    return widget.children!
+        .asMap()
+        .map(
+          (index, child) => MapEntry(
+            index,
+            OverflowPage(
+              onSizeChange: (size) {
+                double childSize =
+                    _isHorizontalScroll ? size.height : size.width;
+                if (childSize > currentMaxChildLength) {
+                  currentMaxChildLength = childSize;
+                }
+                if (widget.useChildrenMaxLength &&
+                    childSize > currentMaxChildLength) {
+                  setState(() {
+                    _sizes = List.filled(widget.children!.length, childSize);
+                  });
+                } else {
+                  setState(() {
+                    _sizes[index] = childSize;
+                  });
+                }
+              },
+              child: child,
+              alignment: widget.alignment,
+              scrollDirection: widget.scrollDirection,
             ),
-            child: child,
-            alignment: widget.alignment,
-            scrollDirection: widget.scrollDirection,
           ),
-        ),
-      )
-      .values
-      .toList();
+        )
+        .values
+        .toList();
+  }
 }
 
 class OverflowPage extends StatelessWidget {
